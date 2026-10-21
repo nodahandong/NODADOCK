@@ -13,6 +13,7 @@ export interface Drive {
   readOnly: boolean;
   cacheMode: "off" | "minimal" | "writes" | "full";
   networkMode: boolean;
+  allowSelfSigned: boolean;
   color: string;
 }
 

@@ -42,6 +42,9 @@ pub fn fs_string(drive: &Drive, secret: &Secret, password: Option<&str>) -> Resu
             if !username.is_empty() {
                 s += &format!(",user={}", q(username));
             }
+            if drive.allow_self_signed {
+                s += ",override.no_check_certificate=true";
+            }
             if let Some(pw) = password.filter(|p| !p.is_empty()) {
                 s += &format!(",pass={}", q(&obscure(&drive.id, pw)));
             }
@@ -148,23 +151,40 @@ pub const BAD_PASSWORD: &str = "The server didn't accept the username or passwor
 pub fn friendly_error(raw: &str) -> String {
     let l = raw.to_lowercase();
     let msg = if l.contains("401") || l.contains("unauthorized") || l.contains("authentication") {
-        BAD_PASSWORD
+        // compared as-is by the unlock flow, so no details appended
+        return BAD_PASSWORD.to_string();
     } else if l.contains("invalid_grant") || l.contains("token expired") || l.contains("oauth2") {
         "Google sign-in has expired or was revoked. Edit the drive and sign in again."
     } else if l.contains("winfsp") || l.contains("cgofuse") || l.contains("fuse") && l.contains("not") {
         "The file-system driver isn't installed. Open Settings to install it."
-    } else if l.contains("no such host") || l.contains("connection refused") || l.contains("dial tcp") || l.contains("network is unreachable") {
-        "Can't reach the server. Check the address and your internet connection."
+    } else if l.contains("http response to https client") {
+        "This port speaks http, not https. Edit the drive and set Protocol to http://."
+    } else if l.contains("first record does not look like a tls handshake") || l.contains("tls: ") && !l.contains("x509") {
+        "The secure (https) connection failed. If the server uses plain http on this port, set Protocol to http://."
     } else if l.contains("x509") || l.contains("certificate") {
-        "The server's security certificate isn't trusted."
+        "The server's security certificate isn't trusted (common with a NAS). If this is your own server, edit the drive and turn on \"Allow self-signed certificate\"."
+    } else if l.contains("no such host") {
+        "The server name couldn't be found. Check the spelling of the address."
+    } else if l.contains("connection refused") || l.contains("actively refused") {
+        "The server refused the connection on this port. Check the port number, and that WebDAV is turned on in the server."
+    } else if l.contains("timeout") || l.contains("timed out") || l.contains("took too long") || l.contains("failed to respond") {
+        "The server didn't answer. The port may be blocked by a firewall, or the server may only be reachable from your office network or VPN."
+    } else if l.contains("connection reset") || l.contains("forcibly closed") {
+        "The server closed the connection. Check the Protocol (http/https) and port."
+    } else if l.contains("dial tcp") || l.contains("network is unreachable") {
+        "Can't reach the server. Check the address and your internet connection."
     } else if l.contains("404") || l.contains("not found") && l.contains("directory") {
-        "That folder doesn't exist on the server."
+        "That folder or WebDAV path doesn't exist on the server."
+    } else if l.contains("405") || l.contains("method not allowed") {
+        "The server answered, but not as WebDAV. Check the WebDAV path, and that WebDAV is enabled."
     } else if l.contains("already") && (l.contains("mount") || l.contains("in use") || l.contains("exists")) {
         "That drive letter or folder is already in use."
     } else {
         return raw.to_string();
     };
-    msg.to_string()
+    // Keep rclone's own words too, so problems can be diagnosed.
+    let detail: String = raw.trim().chars().take(240).collect();
+    format!("{msg}\nDetails: {detail}")
 }
 
 #[cfg(test)]
@@ -195,7 +215,9 @@ mod tests {
     #[test]
     fn friendly_errors() {
         assert!(friendly_error("401 Unauthorized").contains("password"));
-        assert!(friendly_error("dial tcp: lookup x: no such host").contains("reach"));
+        assert!(friendly_error("dial tcp: lookup x: no such host").contains("couldn't be found"));
+        assert!(friendly_error("http: server gave HTTP response to HTTPS client").contains("http://"));
+        assert_eq!(friendly_error("401 Unauthorized"), BAD_PASSWORD);
         assert_eq!(friendly_error("weird"), "weird");
     }
 }

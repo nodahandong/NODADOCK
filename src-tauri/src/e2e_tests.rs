@@ -37,6 +37,7 @@ async fn e2e_webdav_mount_cycle() {
         read_only: false,
         cache_mode: "full".into(),
         network_mode: false,
+        allow_self_signed: false,
         color: String::new(),
     };
 

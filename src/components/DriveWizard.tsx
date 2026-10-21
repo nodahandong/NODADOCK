@@ -34,6 +34,7 @@ function newDrive(type: "webdav" | "gdrive", index: number): Drive {
     readOnly: false,
     cacheMode: "full",
     networkMode: false,
+    allowSelfSigned: false,
     color: COLORS[index % COLORS.length],
   };
 }
@@ -255,6 +256,12 @@ export function DriveWizard({ existing, info, driveCount, onClose, onSaved }: {
                 placeholder={editing && d.rememberPassword ? "••••••••" : ""} />
             </Field>
           </div>
+          {parts.scheme === "https" && (
+            <label className="check">
+              <input type="checkbox" checked={d.allowSelfSigned} onChange={(e) => { set({ allowSelfSigned: e.target.checked }); setTested(null); }} />
+              Allow self-signed certificate (for a NAS or office server that shows a certificate warning in the browser)
+            </label>
+          )}
           {tested && (tested.total ? (
             <div className="note ok"><Icon.Check size={16} />Connected. {formatBytes(tested.free)} free of {formatBytes(tested.total)}.</div>
           ) : null)}

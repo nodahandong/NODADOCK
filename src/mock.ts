@@ -17,6 +17,7 @@ const base: Omit<Drive, "id" | "name" | "provider"> = {
   readOnly: false,
   cacheMode: "full",
   networkMode: false,
+  allowSelfSigned: false,
   color: "",
 };
 

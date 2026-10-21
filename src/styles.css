@@ -186,7 +186,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .dot.off { background: var(--muted); }
 .dot.bad { background: var(--bad); }
 .dot.busy { background: var(--accent); }
-.drive-error { display: flex; gap: 6px; align-items: flex-start; color: var(--bad); font-size: 12.5px; }
+.drive-error { overflow-wrap: anywhere; white-space: pre-line; user-select: text; -webkit-user-select: text; display: flex; gap: 6px; align-items: flex-start; color: var(--bad); font-size: 12.5px; }
 .drive-error svg { margin-top: 2px; flex-shrink: 0; }
 .usage { display: grid; gap: 6px; }
 .usage-row { display: flex; justify-content: space-between; font-size: 12px; }
@@ -321,7 +321,7 @@ select.compact { width: auto; min-width: 110px; }
 .note { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 10px; font-size: 13px; }
 .note.ok { background: var(--ok-soft); color: var(--ok); }
 .note.bad { background: var(--bad-soft); color: var(--bad); }
-.note.bad span { flex: 1; }
+.note.bad span { flex: 1; white-space: pre-line; user-select: text; -webkit-user-select: text; overflow-wrap: anywhere; }
 .ok-text { display: inline-flex; align-items: center; gap: 6px; color: var(--ok); font-weight: 600; font-size: 13px; }
 .err-text { color: var(--bad); font-size: 12.5px; }
 

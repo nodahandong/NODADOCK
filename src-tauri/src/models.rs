@@ -49,6 +49,9 @@ pub struct Drive {
     /// rclone VFS cache mode: off | minimal | writes | full
     #[serde(default = "default_cache_mode")]
     pub cache_mode: String,
+    /// WebDAV: accept self-signed / untrusted TLS certificates (typical for a NAS).
+    #[serde(default)]
+    pub allow_self_signed: bool,
     /// Windows only: show as a network drive instead of a local disk.
     #[serde(default)]
     pub network_mode: bool,
