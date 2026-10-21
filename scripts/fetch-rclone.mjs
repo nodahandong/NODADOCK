@@ -12,6 +12,7 @@ import { join } from "node:path";
 const triple = process.argv[2] || /host: (\S+)/.exec(execSync("rustc -vV").toString())[1];
 const map = {
   "x86_64-pc-windows-msvc": "windows-amd64",
+  "x86_64-pc-windows-gnu": "windows-amd64",
   "aarch64-pc-windows-msvc": "windows-arm64",
   "x86_64-apple-darwin": "osx-amd64",
   "aarch64-apple-darwin": "osx-arm64",
