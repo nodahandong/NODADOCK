@@ -241,7 +241,8 @@ mod tests {
 
     #[test]
     fn picks_registered_mount_type() {
-        let s = Settings::default();
+        // force FUSE: on a Mac without FUSE installed "auto" means NFS
+        let s = Settings { mac_mount_backend: "fuse".into(), ..Settings::default() };
         let avail = |v: &[&str]| v.iter().map(|x| x.to_string()).collect::<Vec<_>>();
         let expected = if cfg!(any(windows, target_os = "macos")) { "cmount" } else { "mount" };
         assert_eq!(pick_mount_type(&s, &avail(&["cmount", "mount"])), expected);
