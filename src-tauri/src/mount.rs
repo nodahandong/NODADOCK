@@ -108,11 +108,23 @@ pub fn resolve_mount_point(drive: &Drive, taken: &[String]) -> Result<String, St
     Ok(base.to_string_lossy().into_owned())
 }
 
-pub fn mount_params(drive: &Drive, fs: &str, mount_point: &str, settings: &Settings) -> Value {
-    let kind = match mount_type(settings) {
-        MountType::Fuse => "mount",
-        MountType::Nfs => "nfsmount",
+/// Picks the rclone mount implementation from those this rclone build has
+/// (`mount/types`). On Windows and macOS the FUSE one is registered for the
+/// remote-control API as "cmount", on Linux as "mount".
+pub fn pick_mount_type(settings: &Settings, available: &[String]) -> String {
+    let wanted: &[&str] = match mount_type(settings) {
+        MountType::Nfs => &["nfsmount"],
+        MountType::Fuse if cfg!(any(windows, target_os = "macos")) => &["cmount", "mount"],
+        MountType::Fuse => &["mount", "cmount", "mount2"],
     };
+    wanted
+        .iter()
+        .find(|w| available.iter().any(|a| a == *w))
+        .unwrap_or(&wanted[0])
+        .to_string()
+}
+
+pub fn mount_params(drive: &Drive, fs: &str, mount_point: &str, settings: &Settings, kind: &str) -> Value {
     let mut mount_opt = json!({ "VolumeName": drive.name });
     if cfg!(windows) && drive.network_mode {
         mount_opt["NetworkMode"] = json!(true);
@@ -163,6 +175,15 @@ mod tests {
     fn quotes_values() {
         assert_eq!(q("it's"), "'it''s'");
         assert_eq!(q("https://a:b/c"), "'https://a:b/c'");
+    }
+
+    #[test]
+    fn picks_registered_mount_type() {
+        let s = Settings::default();
+        let avail = |v: &[&str]| v.iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        let expected = if cfg!(any(windows, target_os = "macos")) { "cmount" } else { "mount" };
+        assert_eq!(pick_mount_type(&s, &avail(&["cmount", "mount"])), expected);
+        assert_eq!(pick_mount_type(&s, &avail(&["cmount"])), "cmount");
     }
 
     #[test]

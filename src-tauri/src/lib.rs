@@ -407,7 +407,14 @@ async fn mount_inner(state: &AppState, drive: &mut Drive, password: Option<Strin
         std::fs::create_dir_all(&mount_point).map_err(|e| format!("Couldn't create {mount_point}: {e}"))?;
     }
     let settings = state.store.settings();
-    rc.call("mount/mount", mount::mount_params(drive, &fs, &mount_point, &settings))
+    let types: Vec<String> = rc
+        .call_timeout("mount/types", json!({}), Duration::from_secs(5))
+        .await
+        .ok()
+        .and_then(|v| serde_json::from_value(v["mountTypes"].clone()).ok())
+        .unwrap_or_default();
+    let kind = mount::pick_mount_type(&settings, &types);
+    rc.call("mount/mount", mount::mount_params(drive, &fs, &mount_point, &settings, &kind))
         .await
         .map_err(|e| mount::friendly_error(&e))?;
     Ok(mount_point)

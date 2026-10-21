@@ -62,7 +62,7 @@ async fn e2e_webdav_mount_cycle() {
     assert_eq!(fs, mount::fs_string(&drive, &Secret::default(), Some(password)).unwrap(), "fs string must be stable");
     let mp = mount::resolve_mount_point(&drive, &[]).unwrap();
     std::fs::create_dir_all(&mp).unwrap();
-    rc.call("mount/mount", mount::mount_params(&drive, &fs, &mp, &Settings::default())).await.unwrap();
+    rc.call("mount/mount", mount::mount_params(&drive, &fs, &mp, &Settings::default(), "mount")).await.unwrap();
     assert_eq!(std::fs::read_to_string(format!("{mp}/hello.txt")).unwrap(), "hi");
 
     std::fs::write(format!("{mp}/new.txt"), "written through the mount").unwrap();
