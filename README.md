@@ -1,6 +1,14 @@
-# NodaDock
+<p align="center">
+  <img src="assets/icon.png" width="128" alt="NodaDock icon">
+</p>
 
-Use your WebDAV server or Google Drive like a normal disk on **Windows** and **macOS**.
+<h1 align="center">NodaDock</h1>
+
+<p align="center">
+  Use your cloud storage like a normal disk on <b>Windows</b> and <b>macOS</b>.<br>
+  <a href="https://github.com/nodahandong/noda/releases/tag/builds"><b>Download for Windows and Mac</b></a>
+</p>
+
 A drive gets its own letter in File Explorer (for example `Z:`) or appears in Finder,
 reconnects by itself after a restart, and needs **no account or sign-up**.
 
@@ -11,8 +19,9 @@ no code, artwork or design with them.
 
 ## What it does
 
-- **WebDAV**: Nextcloud, ownCloud, Synology, QNAP, SharePoint (on-premises), Fastmail, or any WebDAV server.
-- **Google Drive**: My Drive or any shared drive, signed in once through your browser.
+- **Cloud drives**: Google Drive (incl. shared drives), OneDrive, Dropbox, Box, MEGA.
+- **Your own server or NAS**: WebDAV (Nextcloud, ownCloud, Synology, QNAP…), SFTP, FTP/FTPS, with any port.
+- **Object storage**: S3-compatible (Amazon S3, Wasabi, Cloudflare R2, MinIO…) and Backblaze B2.
 - **Your choice of password handling, per drive**
   - *Remember it*: kept in Windows Credential Manager / macOS Keychain, never in a plain file.
     The drive reconnects on its own after every restart.
@@ -25,9 +34,13 @@ no code, artwork or design with them.
 - Live upload/download activity, storage usage per drive, read-only mode, drive colours,
   light and dark themes, network-drive mode on Windows.
 
-| After a restart ("Ask every time") | Adding a drive |
+| Adding a drive | After a restart ("Ask every time") |
 |---|---|
-| ![Unlock](docs/screenshots/unlock-after-restart.png) | ![Add drive](docs/screenshots/add-drive.png) |
+| ![Add drive](docs/screenshots/add-drive.png) | ![Unlock](docs/screenshots/unlock-after-restart.png) |
+
+| Dark mode | Settings |
+|---|---|
+| ![Dark mode](docs/screenshots/drives-dark.png) | ![Settings](docs/screenshots/settings.png) |
 
 ## Getting the installers
 
