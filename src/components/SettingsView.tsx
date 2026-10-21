@@ -19,19 +19,19 @@ export function SettingsView({ settings, onChange, info, status }: {
       <header className="page-head">
         <div>
           <h1>Settings</h1>
-          <p className="muted">CloudDock works without an account. Everything stays on this computer.</p>
+          <p className="muted">NodaDock works without an account. Everything stays on this computer.</p>
         </div>
       </header>
 
       <section className="card">
         <h2 className="card-title">Startup</h2>
-        <Row title="Start CloudDock when I sign in" desc="Your drives reconnect by themselves after every restart.">
+        <Row title="Start NodaDock when I sign in" desc="Your drives reconnect by themselves after every restart.">
           <Switch checked={settings.launchAtLogin} onChange={(v) => set({ launchAtLogin: v })} label="Launch at login" />
         </Row>
         <Row title="Start quietly in the background" desc={`Open in the ${info?.os === "macos" ? "menu bar" : "system tray"} instead of showing this window. You'll still be asked for any passwords that aren't saved.`}>
           <Switch checked={settings.startMinimized} onChange={(v) => set({ startMinimized: v })} label="Start minimized" />
         </Row>
-        <Row title="Keep drives connected when I close this window" desc="Closing the window leaves CloudDock running so your drives stay available.">
+        <Row title="Keep drives connected when I close this window" desc="Closing the window leaves NodaDock running so your drives stay available.">
           <Switch checked={settings.closeToTray} onChange={(v) => set({ closeToTray: v })} label="Close to tray" />
         </Row>
       </section>
@@ -46,7 +46,7 @@ export function SettingsView({ settings, onChange, info, status }: {
 
       <section className="card">
         <h2 className="card-title">Cache</h2>
-        <Row title="Maximum cache size" desc="Space CloudDock may use on this computer for files you've opened. Older files are cleared first. Applies the next time a drive connects.">
+        <Row title="Maximum cache size" desc="Space NodaDock may use on this computer for files you've opened. Older files are cleared first. Applies the next time a drive connects.">
           <select className="compact" value={settings.cacheMaxSizeGb} onChange={(e) => set({ cacheMaxSizeGb: Number(e.target.value) })}>
             {[2, 5, 10, 20, 50, 100, 250].map((n) => <option key={n} value={n}>{n} GB</option>)}
           </select>
@@ -64,7 +64,7 @@ export function SettingsView({ settings, onChange, info, status }: {
         {drv && (
           <Row title={`${drv.driver} file-system driver`}
             desc={drv.installed ? "Installed. Drives appear in " + (info?.os === "windows" ? "File Explorer." : "Finder.")
-              : drv.fallback ? `Not installed. CloudDock is using ${drv.fallback} instead, which works without it.`
+              : drv.fallback ? `Not installed. NodaDock is using ${drv.fallback} instead, which works without it.`
               : `Required to show drives in File Explorer. It's free and takes a minute to install.`}>
             {drv.installed ? (
               <span className="pill ok"><i className="dot" />Ready</span>
@@ -83,7 +83,7 @@ export function SettingsView({ settings, onChange, info, status }: {
         </Row>
       </section>
 
-      <p className="muted small center">CloudDock {info?.appVersion} · Powered by rclone · Your passwords never leave this computer except to sign in to your own servers.</p>
+      <p className="muted small center">NodaDock {info?.appVersion} · Powered by rclone · Your passwords never leave this computer except to sign in to your own servers.</p>
     </div>
   );
 }

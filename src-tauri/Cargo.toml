@@ -1,12 +1,12 @@
 [package]
-name = "clouddock"
+name = "nodadock"
 version = "0.1.0"
 description = "Mount WebDAV and Google Drive as local drives"
 edition = "2021"
 license = "MIT"
 
 [lib]
-name = "clouddock_lib"
+name = "nodadock_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

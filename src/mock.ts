@@ -32,7 +32,7 @@ let drives: DriveView[] =
           provider: { type: "webdav", url: "https://cloud.example.com/remote.php/dav/files/noda/", vendor: "nextcloud", username: "noda" },
           mountPoint: "Z:",
           status: "mounted",
-          activeMountPoint: os === "windows" ? "Z:" : "/Users/noda/CloudDock/Work Nextcloud",
+          activeMountPoint: os === "windows" ? "Z:" : "/Users/noda/NodaDock/Work Nextcloud",
           uploads: 2,
         },
         {
@@ -42,7 +42,7 @@ let drives: DriveView[] =
           color: "#12b886",
           provider: { type: "gdrive", account: "noda@gmail.com", sharedDriveId: "", sharedDriveName: "", clientId: "" },
           status: "mounted",
-          activeMountPoint: os === "windows" ? "Y:" : "/Users/noda/CloudDock/Google Drive",
+          activeMountPoint: os === "windows" ? "Y:" : "/Users/noda/NodaDock/Google Drive",
           uploads: 0,
         },
         {
@@ -114,9 +114,9 @@ export async function mockInvoke(cmd: string, a: Record<string, any> = {}): Prom
           ? { os, driver: "WinFsp", installed: true, installUrl: "https://winfsp.dev/rel/" }
           : { os, driver: "FUSE-T", installed: false, fallback: "Built-in NFS", installUrl: "https://www.fuse-t.org/" },
         freeLetters: letters,
-        mountRoot: "/Users/noda/CloudDock",
-        logFile: "C:\\Users\\Noda\\AppData\\Local\\app.clouddock.desktop\\logs\\rclone.log",
-        cacheDir: "C:\\Users\\Noda\\AppData\\Local\\app.clouddock.desktop",
+        mountRoot: "/Users/noda/NodaDock",
+        logFile: "C:\\Users\\Noda\\AppData\\Local\\app.nodadock.desktop\\logs\\rclone.log",
+        cacheDir: "C:\\Users\\Noda\\AppData\\Local\\app.nodadock.desktop",
         appVersion: "0.1.0",
       } satisfies SystemInfo;
     case "get_settings":
@@ -147,7 +147,7 @@ export async function mockInvoke(cmd: string, a: Record<string, any> = {}): Prom
         setDrive(a.id, { status: "locked" });
         throw "The server didn't accept the username or password.";
       }
-      const mp = d.mountPoint || (os === "windows" ? letters.find((l) => !drives.some((x) => x.activeMountPoint === l))! : `/Users/noda/CloudDock/${d.name}`);
+      const mp = d.mountPoint || (os === "windows" ? letters.find((l) => !drives.some((x) => x.activeMountPoint === l))! : `/Users/noda/NodaDock/${d.name}`);
       setDrive(a.id, { status: "mounted", activeMountPoint: mp, rememberPassword: d.rememberPassword || !!a.remember });
       return;
     }

@@ -3,7 +3,7 @@
 use crate::models::Secret;
 use keyring::{Entry, Error};
 
-const SERVICE: &str = "CloudDock";
+const SERVICE: &str = "NodaDock";
 
 fn entry(id: &str) -> Result<Entry, String> {
     Entry::new(SERVICE, &format!("drive:{id}")).map_err(|e| e.to_string())

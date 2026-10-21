@@ -63,11 +63,15 @@ pub async fn authorize(
                     let url = line[start..].split_whitespace().next().unwrap_or("").to_string();
                     on_url(url);
                 }
+                let mut out = output.lock().unwrap();
                 if i == 0 {
-                    let mut out = output.lock().unwrap();
                     out.push_str(&line);
-                    out.push('\n');
+                } else {
+                    // keep rclone's log lines too, so a failure can be explained
+                    out.push_str("LOG ");
+                    out.push_str(&line);
                 }
+                out.push('\n');
             }
         }));
     }
@@ -87,10 +91,30 @@ pub async fn authorize(
     }
 
     let out = output.lock().unwrap().clone();
-    parse_token(&out).ok_or_else(|| "Sign-in was cancelled or didn't finish.".into())
+    parse_token(&out).ok_or_else(|| explain_failure(&out))
+}
+
+fn explain_failure(out: &str) -> String {
+    let l = out.to_lowercase();
+    if l.contains("address already in use") || l.contains("only one usage of each socket") || l.contains("bind") {
+        return "Another sign-in window is still open. Close it (or restart NodaDock) and try again.".into();
+    }
+    if l.contains("access_denied") {
+        return "Google sign-in was cancelled in the browser.".into();
+    }
+    let detail = out
+        .lines()
+        .rev()
+        .find(|line| line.contains("ERROR") || line.contains("Failed") || line.contains("error"))
+        .map(|line| line.trim_start_matches("LOG ").trim().to_string());
+    match detail {
+        Some(d) => format!("Google sign-in didn't finish: {d}"),
+        None => "Google sign-in was cancelled or didn't finish.".into(),
+    }
 }
 
 fn parse_token(out: &str) -> Option<String> {
+    let out: String = out.lines().filter(|l| !l.starts_with("LOG ")).collect::<Vec<_>>().join("\n");
     let start = out.find("--->")? + 4;
     let end = out[start..].find("<---")? + start;
     let token = out[start..end].trim();

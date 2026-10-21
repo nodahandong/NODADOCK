@@ -61,6 +61,19 @@ export function DriveWizard({ existing, info, driveCount, onClose, onSaved }: {
   const [saving, setSaving] = useState(false);
 
   const p = d.provider;
+  const [parts, setPartsState] = useState<UrlParts>(() => splitUrl(p.type === "webdav" ? p.url : ""));
+  const setParts = (next: UrlParts) => {
+    setPartsState(next);
+    setProv({ url: joinUrl(next) });
+  };
+  // Pasting a full link into the address box fills in every field.
+  const setHost = (value: string) => {
+    if (/^https?:\/\//i.test(value.trim())) {
+      const sp = splitUrl(value.trim());
+      if (sp.host) return setParts(sp);
+    }
+    setParts({ ...parts, host: value.replace(/\/+$/, "").trim() });
+  };
   const set = (patch: Partial<Drive>) => { setD((x) => ({ ...x, ...patch })); setError(null); };
   const setProv = (patch: Record<string, string>) => {
     setD((x) => ({ ...x, provider: { ...x.provider, ...patch } as Drive["provider"] }));
@@ -87,6 +100,15 @@ export function DriveWizard({ existing, info, driveCount, onClose, onSaved }: {
       setToken(r.token);
       setProv({ account: r.email ?? "" });
       api.googleSharedDrives(r.token).then(setShared).catch(() => {});
+      // Make sure the new sign-in can actually read the drive.
+      setTesting(true);
+      try {
+        setTested(await api.test({ ...d, provider: { ...p, account: r.email ?? "" } }, { token: r.token, clientSecret }));
+      } catch (e) {
+        setError(`Signed in, but Google Drive couldn't be opened: ${errText(e)}`);
+      } finally {
+        setTesting(false);
+      }
     } catch (e) {
       setError(errText(e));
     } finally {
@@ -97,7 +119,8 @@ export function DriveWizard({ existing, info, driveCount, onClose, onSaved }: {
   async function next() {
     if (step === 1) {
       if (p.type === "webdav") {
-        if (!/^https?:\/\//i.test(p.url.trim())) return setError("Enter the full server address, starting with https://");
+        if (!parts.host.trim()) return setError("Enter the server address.");
+        if (parts.port && (Number(parts.port) < 1 || Number(parts.port) > 65535)) return setError("The port must be a number from 1 to 65535.");
         if (!tested) {
           setTesting(true);
           try {
@@ -172,7 +195,7 @@ export function DriveWizard({ existing, info, driveCount, onClose, onSaved }: {
       }>
       {step === 0 && (
         <div className="choose">
-          <button className="choice" onClick={() => { setD(newDrive("webdav", driveCount)); setStep(1); }}>
+          <button className="choice" onClick={() => { setD(newDrive("webdav", driveCount)); setPartsState(splitUrl("")); setStep(1); }}>
             <span className="choice-icon webdav"><Icon.Server size={26} /></span>
             <span className="choice-text">
               <b>WebDAV server</b>
@@ -191,11 +214,28 @@ export function DriveWizard({ existing, info, driveCount, onClose, onSaved }: {
 
       {step === 1 && p.type === "webdav" && (
         <div className="form">
-          <Field label="Server address" hint={p.vendor === "nextcloud" || p.vendor === "owncloud"
-            ? "Usually https://your-server/remote.php/dav/files/USERNAME/"
-            : "The full WebDAV URL, for example https://files.example.com/dav/"}>
-            <input value={p.url} onChange={(e) => setProv({ url: e.target.value })} placeholder="https://" autoFocus spellCheck={false} />
+          <div className="row-server">
+            <Field label="Protocol">
+              <select value={parts.scheme} onChange={(e) => setParts({ ...parts, scheme: e.target.value })}>
+                <option value="https">https://</option>
+                <option value="http">http://</option>
+              </select>
+            </Field>
+            <Field label="Server address">
+              <input value={parts.host} onChange={(e) => setHost(e.target.value)} placeholder="files.example.com or 192.168.1.20"
+                autoFocus spellCheck={false} />
+            </Field>
+            <Field label="Port">
+              <input value={parts.port} onChange={(e) => setParts({ ...parts, port: e.target.value.replace(/\D/g, "").slice(0, 5) })}
+                placeholder={parts.scheme === "https" ? "443" : "80"} inputMode="numeric" />
+            </Field>
+          </div>
+          <Field label="WebDAV path" hint={p.vendor === "nextcloud" || p.vendor === "owncloud"
+            ? "For Nextcloud/ownCloud: /remote.php/dav/files/USERNAME/"
+            : "Leave empty if WebDAV is at the root of the server. You can also paste a full https:// link into Server address."}>
+            <input value={parts.path} onChange={(e) => setParts({ ...parts, path: e.target.value })} placeholder="/" spellCheck={false} />
           </Field>
+          {p.url && <p className="muted small url-preview">Connects to <code>{p.url}</code></p>}
           <div className="row2">
             <Field label="Server type">
               <select value={p.vendor} onChange={(e) => setProv({ vendor: e.target.value })}>
@@ -240,17 +280,30 @@ export function DriveWizard({ existing, info, driveCount, onClose, onSaved }: {
                 {signingIn ? "Waiting for your browser…" : "Sign in with Google"}
               </button>
               {signingIn ? (
-                <p className="muted center">
-                  Finish signing in in the browser window that just opened.{" "}
-                  {authUrl && <a href="#" onClick={(e) => { e.preventDefault(); api.openUrl(authUrl); }}>Open it again</a>}
-                  {" · "}<a href="#" onClick={(e) => { e.preventDefault(); api.googleCancel(); }}>Cancel</a>
-                </p>
+                <div className="auth-wait">
+                  <p className="muted center">Finish signing in in your web browser, then come back here.</p>
+                  {authUrl && (
+                    <div className="auth-link">
+                      <span className="muted small">Browser didn't open? Copy this link into it:</span>
+                      <div className="auth-link-row">
+                        <code>{authUrl}</code>
+                        <button className="btn soft small" onClick={() => navigator.clipboard?.writeText(authUrl)}>Copy</button>
+                        <button className="btn soft small" onClick={() => api.openUrl(authUrl)}>Open</button>
+                      </div>
+                    </div>
+                  )}
+                  <button className="link-btn" onClick={() => api.googleCancel()}>Cancel sign-in</button>
+                </div>
               ) : (
-                <p className="muted center">Your browser opens Google's sign-in page. CloudDock never sees your Google password.</p>
+                <p className="muted center">Your browser opens Google's sign-in page. NodaDock never sees your Google password.</p>
               )}
             </div>
           )}
 
+          {p.type === "gdrive" && testing && <div className="note"><Spinner />Checking access to Google Drive…</div>}
+          {p.type === "gdrive" && tested && !testing && (
+            <div className="note ok"><Icon.Check size={16} />Google Drive is reachable{tested.total ? `. ${formatBytes(tested.free)} free of ${formatBytes(tested.total)}.` : "."}</div>
+          )}
           {(token || editing) && (
             <div className="row2">
               <Field label="Drive">
@@ -306,7 +359,7 @@ export function DriveWizard({ existing, info, driveCount, onClose, onSaved }: {
                 </select>
               </Field>
             ) : (
-              <Field label="Mount location" hint={`Leave empty to use ${info?.mountRoot ?? "~/CloudDock"}/${d.name || "Name"}`}>
+              <Field label="Mount location" hint={`Leave empty to use ${info?.mountRoot ?? "~/NodaDock"}/${d.name || "Name"}`}>
                 <input value={d.mountPoint} onChange={(e) => set({ mountPoint: e.target.value })} placeholder="Automatic" spellCheck={false} />
               </Field>
             )}
@@ -326,7 +379,7 @@ export function DriveWizard({ existing, info, driveCount, onClose, onSaved }: {
             <label className="option">
               <div>
                 <b>Connect automatically</b>
-                <span className="muted">Mount this drive whenever CloudDock starts, including after a restart.</span>
+                <span className="muted">Mount this drive whenever NodaDock starts, including after a restart.</span>
               </div>
               <Switch checked={d.autoMount} onChange={(v) => set({ autoMount: v })} label="Connect automatically" />
             </label>
@@ -341,7 +394,7 @@ export function DriveWizard({ existing, info, driveCount, onClose, onSaved }: {
                   </button>
                   <button type="button" className={`radio-card ${!d.rememberPassword ? "active" : ""}`} onClick={() => set({ rememberPassword: false })}>
                     <Icon.Lock size={18} />
-                    <span><b>Ask every time</b><span className="muted">Never saved. CloudDock asks for it each time your computer starts.</span></span>
+                    <span><b>Ask every time</b><span className="muted">Never saved. NodaDock asks for it each time your computer starts.</span></span>
                   </button>
                 </div>
               </div>
@@ -388,6 +441,25 @@ export function DriveWizard({ existing, info, driveCount, onClose, onSaved }: {
       )}
     </Modal>
   );
+}
+
+interface UrlParts { scheme: string; host: string; port: string; path: string }
+
+function splitUrl(url: string): UrlParts {
+  try {
+    const u = new URL(url);
+    return { scheme: u.protocol.replace(":", ""), host: u.hostname, port: u.port, path: u.pathname === "/" ? "" : decodeURI(u.pathname) };
+  } catch {
+    return { scheme: "https", host: "", port: "", path: "" };
+  }
+}
+
+function joinUrl(f: UrlParts): string {
+  const host = f.host.trim();
+  if (!host) return "";
+  let path = f.path.trim();
+  if (path && !path.startsWith("/")) path = "/" + path;
+  return `${f.scheme}://${host}${f.port ? ":" + f.port : ""}${path}`;
 }
 
 function capitalize(s: string) {

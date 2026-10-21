@@ -1,5 +1,5 @@
 //! End-to-end check of the mount path against a real rclone and a local
-//! WebDAV server. Run with: CLOUDDOCK_E2E=1 cargo test e2e -- --nocapture
+//! WebDAV server. Run with: NODADOCK_E2E=1 cargo test e2e -- --nocapture
 use crate::models::{Drive, Provider, Secret, Settings};
 use crate::{mount, rclone::Rclone, secrets};
 use serde_json::json;
@@ -8,10 +8,10 @@ use std::time::Duration;
 
 #[tokio::test]
 async fn e2e_webdav_mount_cycle() {
-    if std::env::var("CLOUDDOCK_E2E").is_err() {
+    if std::env::var("NODADOCK_E2E").is_err() {
         return;
     }
-    let tmp = std::env::temp_dir().join(format!("clouddock-e2e-{}", std::process::id()));
+    let tmp = std::env::temp_dir().join(format!("nodadock-e2e-{}", std::process::id()));
     let served = tmp.join("served");
     std::fs::create_dir_all(served.join("Docs")).unwrap();
     std::fs::write(served.join("Docs/hello.txt"), "hi").unwrap();

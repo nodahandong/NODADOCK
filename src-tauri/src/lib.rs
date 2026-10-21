@@ -654,7 +654,7 @@ async fn start_engine(app: &AppHandle) {
     let state = app.state::<AppState>();
     *state.engine_error.lock().unwrap() = None;
     let result = match rclone::find_binary() {
-        None => Err("The rclone engine wasn't found. Please reinstall CloudDock.".to_string()),
+        None => Err("The rclone engine wasn't found. Please reinstall NodaDock.".to_string()),
         Some(bin) => Rclone::start(bin, &state.data_dir, &state.cache_dir, &state.log_file).await,
     };
     match result {
@@ -690,16 +690,16 @@ fn request_quit(app: &AppHandle) {
 }
 
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
-    let open = MenuItem::with_id(app, "open", "Open CloudDock", true, None::<&str>)?;
+    let open = MenuItem::with_id(app, "open", "Open NodaDock", true, None::<&str>)?;
     let mount = MenuItem::with_id(app, "mount_all", "Connect all drives", true, None::<&str>)?;
     let unmount = MenuItem::with_id(app, "unmount_all", "Disconnect all drives", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", "Quit CloudDock", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "Quit NodaDock", true, None::<&str>)?;
     let sep = PredefinedMenuItem::separator(app)?;
     let sep2 = PredefinedMenuItem::separator(app)?;
     let menu = Menu::with_items(app, &[&open, &sep, &mount, &unmount, &sep2, &quit])?;
 
     let mut builder = TrayIconBuilder::with_id("main")
-        .tooltip("CloudDock")
+        .tooltip("NodaDock")
         .menu(&menu)
         .show_menu_on_left_click(cfg!(target_os = "macos"))
         .on_menu_event(|app, event| match event.id.as_ref() {
@@ -833,7 +833,7 @@ pub fn run() {
             restart_engine,
         ])
         .build(tauri::generate_context!())
-        .expect("error while building CloudDock");
+        .expect("error while building NodaDock");
 
     app.run(|app, event| {
         if let RunEvent::Exit = event {

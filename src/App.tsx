@@ -144,7 +144,7 @@ export default function App() {
       <aside className="sidebar">
         <div className="brand">
           <img src="/logo.svg" alt="" width={30} height={30} />
-          <span>CloudDock</span>
+          <span>NodaDock</span>
         </div>
         <nav>
           <NavItem icon={<Icon.Drives />} label="Drives" active={view === "drives"} onClick={() => setView("drives")} badge={drives.length || undefined} />

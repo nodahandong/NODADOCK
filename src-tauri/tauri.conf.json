@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "CloudDock",
+  "productName": "NodaDock",
   "version": "0.1.0",
-  "identifier": "app.clouddock.desktop",
+  "identifier": "app.nodadock.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "CloudDock",
+        "title": "NodaDock",
         "width": 1080,
         "height": 720,
         "minWidth": 860,

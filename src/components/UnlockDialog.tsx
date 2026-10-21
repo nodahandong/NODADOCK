@@ -43,7 +43,7 @@ export function UnlockDialog({ drives, info, colorOf, onClose }: {
   return (
     <Modal width={520} onClose={onClose}
       title={<span className="unlock-title"><span className="unlock-badge"><Icon.Lock size={18} /></span>Unlock your drives</span>}
-      subtitle={rows.length > 1 ? "These drives are set to ask for their password when CloudDock starts." : "This drive is set to ask for its password when CloudDock starts."}
+      subtitle={rows.length > 1 ? "These drives are set to ask for their password when NodaDock starts." : "This drive is set to ask for its password when NodaDock starts."}
       footer={
         <>
           <label className="check">

@@ -1,4 +1,4 @@
-// Downloads the rclone binary that CloudDock bundles, and names it the way
+// Downloads the rclone binary that NodaDock bundles, and names it the way
 // Tauri expects for an external binary: src-tauri/binaries/rclone-<target-triple>[.exe]
 //
 //   node scripts/fetch-rclone.mjs                 # for this machine

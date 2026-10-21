@@ -531,29 +531,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "clouddock"
-version = "0.1.0"
-dependencies = [
- "aes",
- "base64 0.22.1",
- "ctr",
- "dirs 5.0.1",
- "keyring",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "sha2",
- "tauri",
- "tauri-build",
- "tauri-plugin-autostart",
- "tauri-plugin-opener",
- "tauri-plugin-single-instance",
- "tokio",
- "uuid",
- "windows-sys 0.59.0",
-]
-
-[[package]]
 name = "combine"
 version = "4.6.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2343,6 +2320,29 @@ dependencies = [
  "cfg-if",
  "cfg_aliases",
  "libc",
+]
+
+[[package]]
+name = "nodadock"
+version = "0.1.0"
+dependencies = [
+ "aes",
+ "base64 0.22.1",
+ "ctr",
+ "dirs 5.0.1",
+ "keyring",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-autostart",
+ "tauri-plugin-opener",
+ "tauri-plugin-single-instance",
+ "tokio",
+ "uuid",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

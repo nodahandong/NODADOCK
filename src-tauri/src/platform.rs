@@ -88,7 +88,7 @@ pub fn free_drive_letters() -> Vec<String> {
 
 /// Folder that holds automatically-created mount points on macOS/Linux.
 pub fn mount_root() -> PathBuf {
-    dirs::home_dir().unwrap_or_else(|| PathBuf::from("/tmp")).join("CloudDock")
+    dirs::home_dir().unwrap_or_else(|| PathBuf::from("/tmp")).join("NodaDock")
 }
 
 pub fn sanitize_name(name: &str) -> String {
