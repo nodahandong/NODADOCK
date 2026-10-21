@@ -2,6 +2,7 @@ import { useState } from "react";
 import { api, errText } from "../api";
 import type { DriveView, SystemInfo } from "../types";
 import { credentialStore, subtitle } from "../util";
+import { serviceOf } from "../services";
 import { Icon, ProviderIcon } from "./Icons";
 import { Modal, PasswordInput, Spinner } from "./ui";
 
@@ -62,7 +63,7 @@ export function UnlockDialog({ drives, info, colorOf, onClose }: {
       <div className="unlock-list">
         {rows.map((d, i) => (
           <div key={d.id} className={`unlock-row ${done[d.id] ? "done" : ""}`} style={{ ["--drive" as string]: colorOf(d) }}>
-            <div className="drive-tile small"><ProviderIcon type={d.provider.type} size={18} /></div>
+            <div className="drive-tile small"><ProviderIcon id={serviceOf(d).id} size={18} /></div>
             <div className="unlock-main">
               <div className="unlock-name"><b>{d.name}</b><span className="muted ellipsis">{subtitle(d)}</span></div>
               {done[d.id] ? (

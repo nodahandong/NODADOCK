@@ -1,4 +1,4 @@
-import type { SVGProps } from "react";
+import type { JSX, SVGProps } from "react";
 
 type P = SVGProps<SVGSVGElement> & { size?: number };
 
@@ -42,9 +42,31 @@ export const Icon = {
   ),
   GDrive: (p: P) => <Svg {...p}><path d="M8.5 3.5h7l6 10.5-3.5 6h-12L2.5 14z" /><path d="M8.5 3.5l6 10.5h7M2.5 14h12l-3.5 6" /></Svg>,
   Power: (p: P) => <Svg {...p}><path d="M12 3v9M6.3 7a8 8 0 1 0 11.4 0" /></Svg>,
+  OneDrive: (p: P) => <Svg {...p}><path d="M9.5 9.2A5 5 0 0 1 18.4 11a3.6 3.6 0 0 1 .1 7.2H7a4 4 0 0 1-.6-7.9 5 5 0 0 1 3.1-1.1z" /></Svg>,
+  Dropbox: (p: P) => <Svg {...p}><path d="M7 3.5l5 3.2-5 3.2-5-3.2zM17 3.5l5 3.2-5 3.2-5-3.2zM2 13.1l5-3.2 5 3.2-5 3.2zM12 13.1l5-3.2 5 3.2-5 3.2zM7 17.4l5 3.1 5-3.1" /></Svg>,
+  Box: (p: P) => <Svg {...p}><path d="M3 7.5L12 3l9 4.5v9L12 21l-9-4.5z" /><path d="M3 7.5l9 4.5 9-4.5M12 12v9" /></Svg>,
+  Terminal: (p: P) => <Svg {...p}><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M7 9l3 3-3 3M12 15h5" /></Svg>,
+  Transfer: (p: P) => <Svg {...p}><path d="M7 4v13M3 13l4 4 4-4M17 20V7M13 11l4-4 4 4" /></Svg>,
+  Bucket: (p: P) => <Svg {...p}><ellipse cx="12" cy="6" rx="8" ry="3" /><path d="M4 6l1.8 12.2c.2 1.6 2.9 2.8 6.2 2.8s6-1.2 6.2-2.8L20 6" /></Svg>,
+  Flame: (p: P) => <Svg {...p}><path d="M12 21a7 7 0 0 0 7-7c0-4-3-6-4-10-2 2-3 4-3 6-1-1-2-2-2-4-2 2-5 5-5 8a7 7 0 0 0 7 7z" /></Svg>,
+  Mega: (p: P) => <Svg {...p}><circle cx="12" cy="12" r="9" /><path d="M8 16V8l4 5 4-5v8" /></Svg>,
   Cloud: (p: P) => <Svg {...p}><path d="M7 18a5 5 0 0 1-.5-10A6 6 0 0 1 18 9a4.5 4.5 0 0 1-.5 9z" /></Svg>,
 };
 
-export function ProviderIcon({ type, size = 22 }: { type: "webdav" | "gdrive"; size?: number }) {
-  return type === "gdrive" ? <Icon.GDrive size={size} /> : <Icon.Server size={size} />;
+const SERVICE_ICONS: Record<string, (p: P) => JSX.Element> = {
+  webdav: Icon.Server,
+  gdrive: Icon.GDrive,
+  onedrive: Icon.OneDrive,
+  dropbox: Icon.Dropbox,
+  box: Icon.Box,
+  sftp: Icon.Terminal,
+  ftp: Icon.Transfer,
+  s3: Icon.Bucket,
+  b2: Icon.Flame,
+  mega: Icon.Mega,
+};
+
+export function ProviderIcon({ id, size = 22 }: { id: string; size?: number }) {
+  const I = SERVICE_ICONS[id] ?? Icon.Cloud;
+  return <I size={size} />;
 }

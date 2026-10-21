@@ -1,5 +1,5 @@
 //! Turns a saved drive + its secret into rclone remote-control calls.
-use crate::models::{Drive, Provider, Secret, Settings};
+use crate::models::{Drive, Provider, Secret, Settings, OAUTH_BACKENDS, PASSWORD_BACKENDS};
 use crate::platform;
 use serde_json::{json, Value};
 
@@ -61,6 +61,36 @@ pub fn fs_string(drive: &Drive, secret: &Secret, password: Option<&str>) -> Resu
             }
             if !shared_drive_id.is_empty() {
                 s += &format!(",team_drive={}", q(shared_drive_id));
+            }
+            Ok(format!("{s}:{root}"))
+        }
+        Provider::Cloud { backend, options, .. } => {
+            let b = backend.as_str();
+            if !OAUTH_BACKENDS.contains(&b) && !PASSWORD_BACKENDS.contains(&b) {
+                return Err(format!("Unsupported service: {backend}"));
+            }
+            let mut s = format!(":{b}");
+            for (k, v) in options {
+                if v.trim().is_empty() {
+                    continue;
+                }
+                if !k.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_') {
+                    return Err(format!("Invalid setting name: {k}"));
+                }
+                s += &format!(",{k}={}", q(v.trim()));
+            }
+            if OAUTH_BACKENDS.contains(&b) {
+                let token = secret.token.as_deref().ok_or("This drive isn't signed in. Edit the drive and sign in again.")?;
+                s += &format!(",token={}", q(token));
+                if let Some(cs) = &secret.client_secret {
+                    s += &format!(",client_secret={}", q(cs));
+                }
+            } else if let Some(pw) = password.filter(|p| !p.is_empty()) {
+                s += &match b {
+                    "s3" => format!(",secret_access_key={}", q(pw)),
+                    "b2" => format!(",key={}", q(pw)),
+                    _ => format!(",pass={}", q(&obscure(&drive.id, pw))),
+                };
             }
             Ok(format!("{s}:{root}"))
         }
@@ -145,12 +175,24 @@ pub fn mount_params(drive: &Drive, fs: &str, mount_point: &str, settings: &Setti
     })
 }
 
-pub const BAD_PASSWORD: &str = "The server didn't accept the username or password.";
+pub const BAD_PASSWORD: &str = "The server didn't accept the login details (username, password or key).";
 
 /// Rewrites rclone's raw errors into something a person can act on.
 pub fn friendly_error(raw: &str) -> String {
     let l = raw.to_lowercase();
-    let msg = if l.contains("401") || l.contains("unauthorized") || l.contains("authentication") {
+    let msg = if l.contains("401")
+        || l.contains("unauthorized")
+        || l.contains("authentication")
+        || l.contains("unable to authenticate")
+        || l.contains("incorrect password")
+        || l.contains("login incorrect")
+        || l.contains("530 ")
+        || l.contains("signaturedoesnotmatch")
+        || l.contains("invalidaccesskeyid")
+        || l.contains("bad_auth_token")
+        || l.contains("unauthorized_application_key")
+        || l.contains("eaccess")
+    {
         // compared as-is by the unlock flow, so no details appended
         return BAD_PASSWORD.to_string();
     } else if l.contains("invalid_grant") || l.contains("token expired") || l.contains("oauth2") {
@@ -207,6 +249,23 @@ mod tests {
     }
 
     #[test]
+    fn cloud_fs_strings() {
+        use std::collections::BTreeMap;
+        let mut d: Drive = serde_json::from_value(serde_json::json!({
+            "name": "x", "provider": { "type": "cloud", "backend": "s3",
+            "options": { "provider": "AWS", "access_key_id": "AK", "region": "" } }, "remotePath": "bucket/dir"
+        })).unwrap();
+        let fs = fs_string(&d, &Secret::default(), Some("SK")).unwrap();
+        assert_eq!(fs, ":s3,access_key_id='AK',provider='AWS',secret_access_key='SK':bucket/dir");
+        d.provider = Provider::Cloud { backend: "dropbox".into(), account: String::new(), options: BTreeMap::new() };
+        assert!(fs_string(&d, &Secret::default(), None).is_err());
+        let tok = Secret { token: Some("{}".into()), ..Default::default() };
+        assert_eq!(fs_string(&d, &tok, None).unwrap(), ":dropbox,token='{}':bucket/dir");
+        d.provider = Provider::Cloud { backend: "local".into(), account: String::new(), options: BTreeMap::new() };
+        assert!(fs_string(&d, &tok, None).is_err());
+    }
+
+    #[test]
     fn obscure_is_stable() {
         assert_eq!(obscure("a", "pw"), obscure("a", "pw"));
         assert_ne!(obscure("a", "pw"), obscure("b", "pw"));
@@ -215,6 +274,8 @@ mod tests {
     #[test]
     fn friendly_errors() {
         assert!(friendly_error("401 Unauthorized").contains("password"));
+        assert_eq!(friendly_error("ssh: unable to authenticate, attempted methods"), BAD_PASSWORD);
+        assert_eq!(friendly_error("api error SignatureDoesNotMatch: x"), BAD_PASSWORD);
         assert!(friendly_error("dial tcp: lookup x: no such host").contains("couldn't be found"));
         assert!(friendly_error("http: server gave HTTP response to HTTPS client").contains("http://"));
         assert_eq!(friendly_error("401 Unauthorized"), BAD_PASSWORD);

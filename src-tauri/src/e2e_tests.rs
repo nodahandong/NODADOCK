@@ -91,3 +91,49 @@ async fn e2e_webdav_mount_cycle() {
     rc.shutdown();
     let _ = server.kill();
 }
+
+/// SFTP, FTP and S3 drives built the way the app builds them, against
+/// rclone's own test servers.
+#[tokio::test]
+async fn e2e_cloud_backends() {
+    if std::env::var("NODADOCK_E2E").is_err() {
+        return;
+    }
+    let tmp = std::env::temp_dir().join(format!("nodadock-e2e-cloud-{}", std::process::id()));
+    let served = tmp.join("served");
+    std::fs::create_dir_all(served.join("bucket1/Docs")).unwrap();
+    std::fs::write(served.join("bucket1/Docs/hello.txt"), "hi").unwrap();
+    let bin = crate::rclone::find_binary().expect("rclone");
+    let root = served.to_str().unwrap();
+    let mut servers = vec![
+        Command::new(&bin).args(["serve", "sftp", root, "--addr", "127.0.0.1:18022", "--user", "bob", "--pass", "s3cret"]).spawn().unwrap(),
+        Command::new(&bin).args(["serve", "ftp", root, "--addr", "127.0.0.1:18021", "--user", "bob", "--pass", "s3cret"]).spawn().unwrap(),
+        Command::new(&bin).args(["serve", "s3", root, "--addr", "127.0.0.1:18333", "--auth-key", "AKID,SECRETKEY"]).spawn().unwrap(),
+    ];
+    tokio::time::sleep(Duration::from_millis(1500)).await;
+    let rc = Rclone::start(bin, &tmp.join("data"), &tmp.join("cache"), &tmp.join("log/rclone.log")).await.unwrap();
+
+    let cases = [
+        (json!({ "backend": "sftp", "options": { "host": "127.0.0.1", "port": "18022", "user": "bob" } }), "s3cret", "bucket1"),
+        (json!({ "backend": "ftp", "options": { "host": "127.0.0.1", "port": "18021", "user": "bob" } }), "s3cret", "bucket1"),
+        (json!({ "backend": "s3", "options": { "provider": "Other", "access_key_id": "AKID", "endpoint": "http://127.0.0.1:18333", "region": "us-east-1" } }), "SECRETKEY", "bucket1"),
+    ];
+    for (provider, pw, path) in cases {
+        let mut p = provider.clone();
+        p["type"] = json!("cloud");
+        let drive: Drive = serde_json::from_value(json!({ "id": "c1", "name": "c", "provider": p, "remotePath": path })).unwrap();
+        assert!(drive.uses_password());
+        let fs = mount::fs_string(&drive, &Secret::default(), Some(pw)).unwrap();
+        let v = rc.call("operations/list", json!({ "fs": fs, "remote": "Docs" })).await;
+        let names: Vec<String> = v.as_ref().map(|v| v["list"].as_array().unwrap().iter().map(|e| e["Name"].as_str().unwrap().to_string()).collect()).unwrap_or_default();
+        println!("{} -> {:?} {:?}", provider["backend"], names, v.as_ref().err());
+        assert_eq!(names, vec!["hello.txt".to_string()]);
+        let bad = mount::fs_string(&drive, &Secret::default(), Some("wrong")).unwrap();
+        let err = rc.call_timeout("operations/list", json!({ "fs": bad, "remote": "" }), Duration::from_secs(20)).await.unwrap_err();
+        println!("   wrong password -> {}", mount::friendly_error(&err).lines().next().unwrap());
+    }
+    rc.shutdown();
+    for s in servers.iter_mut() {
+        let _ = s.kill();
+    }
+}

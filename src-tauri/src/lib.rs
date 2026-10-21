@@ -1,6 +1,6 @@
-mod google;
 mod models;
 mod mount;
+mod oauth;
 mod platform;
 mod rclone;
 mod secrets;
@@ -39,7 +39,7 @@ pub struct AppState {
     errors: Mutex<HashMap<String, String>>,
     /// Passwords typed in "ask every time" mode; kept in memory only.
     session_passwords: Mutex<HashMap<String, String>>,
-    auth: Arc<google::AuthSession>,
+    auth: Arc<oauth::AuthSession>,
     unlock_prompt_pending: AtomicBool,
     data_dir: PathBuf,
     cache_dir: PathBuf,
@@ -69,7 +69,7 @@ impl AppState {
     }
 
     fn needs_password(&self, drive: &Drive) -> bool {
-        drive.is_webdav()
+        drive.uses_password()
             && !drive.remember_password
             && !self.session_passwords.lock().unwrap().contains_key(&drive.id)
     }
@@ -297,8 +297,8 @@ async fn save_drive(
     if let Some(cs) = client_secret {
         secret.client_secret = if cs.is_empty() { None } else { Some(cs) };
     }
-    if matches!(drive.provider, Provider::GoogleDrive { .. }) && secret.token.is_none() {
-        return Err("Sign in with Google first.".into());
+    if drive.uses_token() && secret.token.is_none() {
+        return Err("Sign in first.".into());
     }
     secrets::save(&drive.id, &secret)?;
     state.store.upsert_drive(drive.clone())?;
@@ -371,13 +371,13 @@ async fn mount_inner(state: &AppState, drive: &mut Drive, password: Option<Strin
         Some(p) => Some(p),
         None => state.password_for(drive, &secret),
     };
-    if drive.is_webdav() && password.is_none() && !drive.remember_password {
+    if drive.uses_password() && password.is_none() && !drive.remember_password {
         return Err("PASSWORD_REQUIRED".into());
     }
 
     let fs = mount::fs_string(drive, &secret, password.as_deref())?;
 
-    if drive.is_webdav() {
+    if drive.uses_password() {
         // Check credentials first so a wrong password fails fast and clearly.
         rc.call_timeout(
             "operations/list",
@@ -595,27 +595,43 @@ fn open_url(app: AppHandle, url: String) -> Res<()> {
     app.opener().open_url(url, None::<&str>).map_err(|e| e.to_string())
 }
 
-// ---------- Google ----------
+// ---------- browser sign-in ----------
+
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct GoogleAuth {
+struct SignIn {
     token: String,
     email: Option<String>,
+    /// Extra rclone settings discovered at sign-in (OneDrive drive id/type).
+    options: std::collections::BTreeMap<String, String>,
 }
 
+/// Browser sign-in for Google Drive ("drive"), OneDrive, Dropbox or Box.
 #[tauri::command]
-async fn google_sign_in(app: AppHandle, state: State<'_, AppState>, client_id: String, client_secret: String) -> Res<GoogleAuth> {
+async fn cloud_sign_in(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    backend: String,
+    client_id: String,
+    client_secret: String,
+) -> Res<SignIn> {
+    if backend != "drive" && !models::OAUTH_BACKENDS.contains(&backend.as_str()) {
+        return Err("Unsupported service".into());
+    }
     let rc = state.rc().await?;
     let opener_app = app.clone();
-    let token = google::authorize(&rc.bin, client_id.trim(), client_secret.trim(), state.auth.clone(), move |url| {
+    let token = oauth::authorize(&rc.bin, &backend, client_id.trim(), client_secret.trim(), state.auth.clone(), move |url| {
         use tauri_plugin_opener::OpenerExt;
         let _ = opener_app.opener().open_url(&url, None::<&str>);
         let _ = opener_app.emit("google-auth-url", url);
     })
     .await?;
-    let email = google::account_email(&token).await;
-    Ok(GoogleAuth { token, email })
+    let (email, options) = oauth::account_info(&backend, &token).await;
+    if backend == "onedrive" && !options.contains_key("drive_id") {
+        return Err("Signed in, but couldn't find your OneDrive. Please try again.".into());
+    }
+    Ok(SignIn { token, email, options })
 }
 
 #[tauri::command]
@@ -624,8 +640,8 @@ fn google_cancel(state: State<'_, AppState>) {
 }
 
 #[tauri::command]
-async fn google_shared_drives(token: String) -> Res<Vec<google::SharedDrive>> {
-    google::shared_drives(&token).await
+async fn google_shared_drives(token: String) -> Res<Vec<oauth::SharedDrive>> {
+    oauth::shared_drives(&token).await
 }
 
 // ---------- app lifecycle ----------
@@ -777,7 +793,7 @@ pub fn run() {
                 busy: Mutex::new(HashMap::new()),
                 errors: Mutex::new(HashMap::new()),
                 session_passwords: Mutex::new(HashMap::new()),
-                auth: Arc::new(google::AuthSession::default()),
+                auth: Arc::new(oauth::AuthSession::default()),
                 unlock_prompt_pending: AtomicBool::new(true),
                 data_dir,
                 cache_dir,
@@ -833,7 +849,7 @@ pub fn run() {
             open_drive,
             open_logs,
             open_url,
-            google_sign_in,
+            cloud_sign_in,
             google_cancel,
             google_shared_drives,
             quit_app,

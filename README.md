@@ -36,10 +36,10 @@ You don't need to install any developer tools.
 1. Put this folder in a GitHub repository (or ask Claude to push it to one for you).
 2. On GitHub, open **Actions → Build installers → Run workflow**.
 3. After about 10–15 minutes, download from the finished run:
-   - `NodaDock-windows-x64` → `NodaDock_0.1.0_x64-setup.exe` (or the `.msi`)
-   - `NodaDock-macos-apple-silicon` / `NodaDock-macos-intel` → `NodaDock_0.1.0_*.dmg`
+   - `NodaDock-windows-x64` → `NodaDock_0.2.0_x64-setup.exe` (or the `.msi`)
+   - `NodaDock-macos-apple-silicon` / `NodaDock-macos-intel` → `NodaDock_0.2.0_*.dmg`
 
-Pushing a tag like `v0.1.0` runs the same build.
+Pushing a tag like `v0.2.0` runs the same build.
 
 ### One-time driver install
 

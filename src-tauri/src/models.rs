@@ -1,4 +1,10 @@
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+
+/// Services that sign in through the browser (OAuth) and keep a token.
+pub const OAUTH_BACKENDS: &[&str] = &["onedrive", "dropbox", "box"];
+/// Services that use a password or secret key.
+pub const PASSWORD_BACKENDS: &[&str] = &["sftp", "ftp", "mega", "s3", "b2"];
 
 /// Where a drive's files live. Secrets (passwords, OAuth tokens) are never
 /// part of this struct; they live in the OS credential store (see `secrets`).
@@ -23,6 +29,16 @@ pub enum Provider {
         shared_drive_name: String,
         #[serde(default)]
         client_id: String,
+    },
+    /// Any other rclone backend: OneDrive, Dropbox, Box, SFTP, FTP, S3, B2, MEGA.
+    /// `options` holds the non-secret rclone settings (host, user, region…).
+    #[serde(rename = "cloud", rename_all = "camelCase")]
+    Cloud {
+        backend: String,
+        #[serde(default)]
+        account: String,
+        #[serde(default)]
+        options: BTreeMap<String, String>,
     },
 }
 
@@ -60,8 +76,22 @@ pub struct Drive {
 }
 
 impl Drive {
-    pub fn is_webdav(&self) -> bool {
-        matches!(self.provider, Provider::WebDav { .. })
+    /// Uses a password / secret key that can be remembered or asked for.
+    pub fn uses_password(&self) -> bool {
+        match &self.provider {
+            Provider::WebDav { .. } => true,
+            Provider::Cloud { backend, .. } => PASSWORD_BACKENDS.contains(&backend.as_str()),
+            Provider::GoogleDrive { .. } => false,
+        }
+    }
+
+    /// Signs in through the browser and needs an OAuth token.
+    pub fn uses_token(&self) -> bool {
+        match &self.provider {
+            Provider::GoogleDrive { .. } => true,
+            Provider::Cloud { backend, .. } => OAUTH_BACKENDS.contains(&backend.as_str()),
+            Provider::WebDav { .. } => false,
+        }
     }
 }
 

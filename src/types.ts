@@ -1,6 +1,7 @@
 export type Provider =
   | { type: "webdav"; url: string; vendor: string; username: string }
-  | { type: "gdrive"; account: string; sharedDriveId: string; sharedDriveName: string; clientId: string };
+  | { type: "gdrive"; account: string; sharedDriveId: string; sharedDriveName: string; clientId: string }
+  | { type: "cloud"; backend: string; account: string; options: Record<string, string> };
 
 export interface Drive {
   id: string;

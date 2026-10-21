@@ -26,6 +26,14 @@ export function subtitle(d: Drive): string {
     const where = d.provider.sharedDriveName || "My Drive";
     return d.provider.account ? `${d.provider.account} · ${where}` : where;
   }
+  if (d.provider.type === "cloud") {
+    const o = d.provider.options;
+    if (d.provider.account) return d.provider.account;
+    if (o.host) return o.user ? `${o.user}@${o.host}${o.port ? ":" + o.port : ""}` : o.host;
+    if (o.user) return o.user;
+    const label = { s3: "S3", b2: "Backblaze B2" }[d.provider.backend] ?? d.provider.backend;
+    return d.remotePath ? `${label} · ${d.remotePath}` : label;
+  }
   try {
     const u = new URL(d.provider.url);
     return d.provider.username ? `${d.provider.username}@${u.host}` : u.host;

@@ -1,8 +1,10 @@
-//! Google sign-in through `rclone authorize drive`: rclone runs a one-shot
-//! local web server, the person signs in in their browser, and rclone prints
-//! the OAuth token, which we keep in the keychain.
+//! Browser sign-in through `rclone authorize <backend>` (Google Drive,
+//! OneDrive, Dropbox, Box): rclone runs a one-shot local web server, the
+//! person signs in in their browser, and rclone prints the OAuth token, which
+//! we keep in the keychain.
 use crate::rclone;
 use serde::Serialize;
+use std::collections::BTreeMap;
 use std::path::Path;
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
@@ -26,6 +28,7 @@ impl AuthSession {
 /// open it and show it as a fallback link.
 pub async fn authorize(
     bin: &Path,
+    backend: &str,
     client_id: &str,
     client_secret: &str,
     session: Arc<AuthSession>,
@@ -33,7 +36,7 @@ pub async fn authorize(
 ) -> Result<String, String> {
     session.cancel();
     let mut cmd = tokio::process::Command::from(rclone::command(bin));
-    cmd.args(["authorize", "drive"]);
+    cmd.args(["authorize", backend]);
     if !client_id.is_empty() {
         cmd.args([client_id, client_secret]);
     }
@@ -100,7 +103,7 @@ fn explain_failure(out: &str) -> String {
         return "Another sign-in window is still open. Close it (or restart NodaDock) and try again.".into();
     }
     if l.contains("access_denied") {
-        return "Google sign-in was cancelled in the browser.".into();
+        return "Sign-in was cancelled in the browser.".into();
     }
     let detail = out
         .lines()
@@ -108,8 +111,8 @@ fn explain_failure(out: &str) -> String {
         .find(|line| line.contains("ERROR") || line.contains("Failed") || line.contains("error"))
         .map(|line| line.trim_start_matches("LOG ").trim().to_string());
     match detail {
-        Some(d) => format!("Google sign-in didn't finish: {d}"),
-        None => "Google sign-in was cancelled or didn't finish.".into(),
+        Some(d) => format!("Sign-in didn't finish: {d}"),
+        None => "Sign-in was cancelled or didn't finish.".into(),
     }
 }
 
@@ -148,6 +151,45 @@ pub async fn account_email(token: &str) -> Option<String> {
         .await
         .ok()?;
     v["user"]["emailAddress"].as_str().map(str::to_string)
+}
+
+async fn get_json(req: reqwest::RequestBuilder) -> Option<serde_json::Value> {
+    req.timeout(Duration::from_secs(15)).send().await.ok()?.json().await.ok()
+}
+
+/// The account's e-mail (shown on the drive card) and any rclone settings the
+/// service needs besides the token.
+pub async fn account_info(backend: &str, token: &str) -> (Option<String>, BTreeMap<String, String>) {
+    let mut options = BTreeMap::new();
+    let Some(at) = access_token(token) else { return (None, options) };
+    let http = reqwest::Client::new();
+    let email = match backend {
+        "drive" => account_email(token).await,
+        "onedrive" => {
+            if let Some(d) = get_json(http.get("https://graph.microsoft.com/v1.0/me/drive").bearer_auth(&at)).await {
+                if let (Some(id), Some(kind)) = (d["id"].as_str(), d["driveType"].as_str()) {
+                    options.insert("drive_id".into(), id.into());
+                    options.insert("drive_type".into(), kind.into());
+                }
+            }
+            get_json(http.get("https://graph.microsoft.com/v1.0/me").bearer_auth(&at))
+                .await
+                .and_then(|me| me["mail"].as_str().or(me["userPrincipalName"].as_str()).map(str::to_string))
+        }
+        "dropbox" => get_json(
+            http.post("https://api.dropboxapi.com/2/users/get_current_account")
+                .bearer_auth(&at)
+                .header("Content-Type", "application/json")
+                .body("null"),
+        )
+        .await
+        .and_then(|v| v["email"].as_str().map(str::to_string)),
+        "box" => get_json(http.get("https://api.box.com/2.0/users/me").bearer_auth(&at))
+            .await
+            .and_then(|v| v["login"].as_str().map(str::to_string)),
+        _ => None,
+    };
+    (email, options)
 }
 
 /// Shared drives the account can see, so the person can mount one of them

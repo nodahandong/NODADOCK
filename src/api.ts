@@ -38,8 +38,8 @@ export const api = {
   open: (id: string) => call<void>("open_drive", { id }),
   openLogs: () => call<void>("open_logs"),
   openUrl: (url: string) => call<void>("open_url", { url }),
-  googleSignIn: (clientId: string, clientSecret: string) =>
-    call<{ token: string; email?: string | null }>("google_sign_in", { clientId, clientSecret }),
+  signIn: (backend: string, clientId: string, clientSecret: string) =>
+    call<{ token: string; email?: string | null; options: Record<string, string> }>("cloud_sign_in", { backend, clientId, clientSecret }),
   googleCancel: () => call<void>("google_cancel"),
   googleSharedDrives: (token: string) => call<SharedDrive[]>("google_shared_drives", { token }),
   quit: (force: boolean) => call<void>("quit_app", { force }),

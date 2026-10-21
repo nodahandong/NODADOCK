@@ -146,7 +146,7 @@ export async function mockInvoke(cmd: string, a: Record<string, any> = {}): Prom
       await wait(900);
       if (a.password === "wrong") {
         setDrive(a.id, { status: "locked" });
-        throw "The server didn't accept the username or password.";
+        throw "The server didn't accept the login details (username, password or key).";
       }
       const mp = d.mountPoint || (os === "windows" ? letters.find((l) => !drives.some((x) => x.activeMountPoint === l))! : `/Users/noda/NodaDock/${d.name}`);
       setDrive(a.id, { status: "mounted", activeMountPoint: mp, rememberPassword: d.rememberPassword || !!a.remember });
@@ -170,15 +170,15 @@ export async function mockInvoke(cmd: string, a: Record<string, any> = {}): Prom
       return demo === "unlock" ? drives.filter((d) => d.status === "locked").map((d) => d.id) : [];
     case "test_connection":
       await wait(800);
-      if (a.password === "wrong") throw "The server didn't accept the username or password.";
+      if (a.password === "wrong") throw "The server didn't accept the login details (username, password or key).";
       return { total: 5e11, used: 1.2e11, free: 3.8e11 };
     case "drive_usage":
       return usage[a.id] ?? {};
-    case "google_sign_in":
+    case "cloud_sign_in":
       await wait(400);
       emit("google-auth-url", "http://127.0.0.1:53682/auth?state=demo");
       await wait(1800);
-      return { token: '{"access_token":"demo"}', email: "noda@gmail.com" };
+      return { token: '{"access_token":"demo"}', email: "noda@gmail.com", options: {} };
     case "google_shared_drives":
       return [
         { id: "x", name: "Marketing" },

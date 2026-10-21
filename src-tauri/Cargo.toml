@@ -1,6 +1,6 @@
 [package]
 name = "nodadock"
-version = "0.1.0"
+version = "0.2.0"
 description = "Mount WebDAV and Google Drive as local drives"
 edition = "2021"
 license = "MIT"

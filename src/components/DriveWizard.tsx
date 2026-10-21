@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { api, errText, on } from "../api";
 import type { Drive, SharedDrive, SystemInfo, Usage } from "../types";
+import { GROUPS, SERVICES, serviceOf, usesPassword, type Service, type ServiceField } from "../services";
 import { COLORS, credentialStore, formatBytes, hostName } from "../util";
-import { Icon } from "./Icons";
+import { Icon, ProviderIcon } from "./Icons";
 import { Field, Modal, PasswordInput, Segmented, Spinner, Switch } from "./ui";
 
 const VENDORS = [
@@ -20,13 +21,19 @@ const CACHE = [
   { value: "minimal", label: "Streaming", hint: "Uses the least disk space. Some apps that edit files in place may not work." },
 ] as const;
 
-function newDrive(type: "webdav" | "gdrive", index: number): Drive {
+function newDrive(service: Service, index: number): Drive {
+  let provider: Drive["provider"];
+  if (service.kind === "webdav") provider = { type: "webdav", url: "", vendor: "other", username: "" };
+  else if (service.kind === "gdrive") provider = { type: "gdrive", account: "", sharedDriveId: "", sharedDriveName: "", clientId: "" };
+  else {
+    const options: Record<string, string> = {};
+    for (const f of service.fields ?? []) if (f.default) options[f.key] = f.default;
+    provider = { type: "cloud", backend: service.backend!, account: "", options };
+  }
   return {
     id: "",
     name: "",
-    provider: type === "webdav"
-      ? { type, url: "", vendor: "other", username: "" }
-      : { type, account: "", sharedDriveId: "", sharedDriveName: "", clientId: "" },
+    provider,
     remotePath: "",
     mountPoint: "",
     autoMount: true,
@@ -48,7 +55,7 @@ export function DriveWizard({ existing, info, driveCount, onClose, onSaved }: {
 }) {
   const editing = !!existing;
   const [step, setStep] = useState(editing ? 1 : 0);
-  const [d, setD] = useState<Drive>(existing ?? newDrive("webdav", driveCount));
+  const [d, setD] = useState<Drive>(existing ?? newDrive(SERVICES[0], driveCount));
   const [password, setPassword] = useState("");
   const [token, setToken] = useState<string | undefined>();
   const [clientSecret, setClientSecret] = useState<string | undefined>();
@@ -82,6 +89,25 @@ export function DriveWizard({ existing, info, driveCount, onClose, onSaved }: {
     setError(null);
   };
   const os = info?.os;
+  const service = serviceOf(d);
+  const isOAuth = service.kind === "gdrive" || service.kind === "oauth";
+  const opts = p.type === "cloud" ? p.options : {};
+  const setOpt = (patch: Record<string, string>) => {
+    setD((x) => (x.provider.type === "cloud" ? { ...x, provider: { ...x.provider, options: { ...x.provider.options, ...patch } } } : x));
+    setTested(null);
+    setError(null);
+  };
+  const clientId = p.type === "gdrive" ? p.clientId : opts.client_id ?? "";
+  const setClientId = (v: string) => (p.type === "gdrive" ? setProv({ clientId: v }) : setOpt({ client_id: v }));
+  const pick = (svc: Service) => {
+    setD(newDrive(svc, driveCount));
+    setPartsState(splitUrl(""));
+    setPassword("");
+    setToken(undefined);
+    setTested(null);
+    setError(null);
+    setStep(1);
+  };
 
   useEffect(() => {
     let off: (() => void) | undefined;
@@ -92,21 +118,24 @@ export function DriveWizard({ existing, info, driveCount, onClose, onSaved }: {
   const secrets = () => ({ password: password || undefined, token, clientSecret });
 
   async function signIn() {
-    if (p.type !== "gdrive") return;
+    if (!isOAuth) return;
     setSigningIn(true);
     setError(null);
     setAuthUrl(null);
     try {
-      const r = await api.googleSignIn(p.clientId, clientSecret ?? "");
+      const r = await api.signIn(service.backend ?? "drive", clientId, clientSecret ?? "");
       setToken(r.token);
-      setProv({ account: r.email ?? "" });
-      api.googleSharedDrives(r.token).then(setShared).catch(() => {});
+      const provider: Drive["provider"] = p.type === "cloud"
+        ? { ...p, account: r.email ?? "", options: { ...p.options, ...r.options } }
+        : p.type === "gdrive" ? { ...p, account: r.email ?? "" } : p;
+      setD((x) => ({ ...x, provider }));
+      if (p.type === "gdrive") api.googleSharedDrives(r.token).then(setShared).catch(() => {});
       // Make sure the new sign-in can actually read the drive.
       setTesting(true);
       try {
-        setTested(await api.test({ ...d, provider: { ...p, account: r.email ?? "" } }, { token: r.token, clientSecret }));
+        setTested(await api.test({ ...d, provider }, { token: r.token, clientSecret }));
       } catch (e) {
-        setError(`Signed in, but Google Drive couldn't be opened: ${errText(e)}`);
+        setError(`Signed in, but ${service.label} couldn't be opened: ${errText(e)}`);
       } finally {
         setTesting(false);
       }
@@ -133,9 +162,25 @@ export function DriveWizard({ existing, info, driveCount, onClose, onSaved }: {
           setTesting(false);
         }
         if (!d.name) set({ name: capitalize(hostName(p.url)) || "My WebDAV" });
+      } else if (service.kind === "form") {
+        const missing = (service.fields ?? []).find((f) => f.required && !opts[f.key]?.trim());
+        if (missing) return setError(`Enter the ${missing.label.toLowerCase()}.`);
+        const savedSecret = editing && d.rememberPassword;
+        if (service.secretRequired && !password && !savedSecret) return setError(`Enter the ${service.secretLabel!.toLowerCase()}.`);
+        if (!tested) {
+          setTesting(true);
+          try {
+            setTested(await api.test(d, secrets()));
+          } catch (e) {
+            setTesting(false);
+            return setError(errText(e));
+          }
+          setTesting(false);
+        }
+        if (!d.name) set({ name: opts.host ? capitalize(hostName("https://" + opts.host)) || service.label : service.label });
       } else {
-        if (!token && !editing) return setError("Sign in with Google to continue.");
-        if (!d.name) set({ name: p.sharedDriveName || "Google Drive" });
+        if (!token && !editing) return setError(`Sign in with ${service.label} to continue.`);
+        if (!d.name) set({ name: (p.type === "gdrive" && p.sharedDriveName) || service.label });
       }
     }
     setStep(step + 1);
@@ -153,7 +198,7 @@ export function DriveWizard({ existing, info, driveCount, onClose, onSaved }: {
     }
   }
 
-  const title = editing ? `Edit ${existing!.name}` : ["Add a drive", "Connect to your storage", "Set up your drive"][step];
+  const title = editing ? `Edit ${existing!.name}` : ["Add a drive", `Connect to ${service.label}`, "Set up your drive"][step];
   const steps = ["Service", "Connection", "Drive"];
 
   const footer = (
@@ -164,7 +209,7 @@ export function DriveWizard({ existing, info, driveCount, onClose, onSaved }: {
       <span className="grow" />
       {step === 1 && (
         <>
-          {p.type === "webdav" && tested && <span className="ok-text"><Icon.Check size={16} />Connection works</span>}
+          {(p.type === "webdav" || service.kind === "form") && tested && <span className="ok-text"><Icon.Check size={16} />Connection works</span>}
           <button className="btn primary" onClick={next} disabled={testing || signingIn}>
             {testing ? <><Spinner />Checking…</> : "Continue"}
           </button>
@@ -195,21 +240,20 @@ export function DriveWizard({ existing, info, driveCount, onClose, onSaved }: {
         </span>
       }>
       {step === 0 && (
-        <div className="choose">
-          <button className="choice" onClick={() => { setD(newDrive("webdav", driveCount)); setPartsState(splitUrl("")); setStep(1); }}>
-            <span className="choice-icon webdav"><Icon.Server size={26} /></span>
-            <span className="choice-text">
-              <b>WebDAV server</b>
-              <span className="muted">Nextcloud, ownCloud, Synology, QNAP, SharePoint, Box and any server that speaks WebDAV.</span>
-            </span>
-          </button>
-          <button className="choice" onClick={() => { setD(newDrive("gdrive", driveCount)); setStep(1); }}>
-            <span className="choice-icon gdrive"><Icon.GDrive size={26} /></span>
-            <span className="choice-text">
-              <b>Google Drive</b>
-              <span className="muted">Your My Drive or a shared drive. Sign in once in your browser; no password is stored.</span>
-            </span>
-          </button>
+        <div className="services">
+          {GROUPS.map((g) => (
+            <section key={g.id}>
+              <h3 className="services-title">{g.label}</h3>
+              <div className="service-grid">
+                {SERVICES.filter((x) => x.group === g.id).map((svc) => (
+                  <button key={svc.id} className="service" onClick={() => pick(svc)} style={{ ["--svc" as string]: svc.color }}>
+                    <span className="service-icon"><ProviderIcon id={svc.id} size={22} /></span>
+                    <span className="service-text"><b>{svc.label}</b><span className="muted">{svc.desc}</span></span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          ))}
         </div>
       )}
 
@@ -268,13 +312,39 @@ export function DriveWizard({ existing, info, driveCount, onClose, onSaved }: {
         </div>
       )}
 
-      {step === 1 && p.type === "gdrive" && (
+      {step === 1 && service.kind === "form" && (
         <div className="form">
-          {token || (editing && p.account) ? (
+          <div className="form-grid">
+            {(service.fields ?? []).map((f) => (
+              <FormField key={f.key} f={f} opts={opts} setOpt={setOpt} />
+            ))}
+            <div className="wide">
+              <Field label={service.secretLabel ?? "Password"}
+                hint={editing && d.rememberPassword ? "Leave empty to keep the saved one" : service.secretRequired ? undefined : "Optional"}>
+                <PasswordInput value={password} onChange={(v) => { setPassword(v); setTested(null); }} onEnter={next}
+                  placeholder={editing && d.rememberPassword ? "••••••••" : ""} />
+              </Field>
+            </div>
+            <div className="wide">
+              <Field label={service.pathLabel ?? "Folder on server"} hint={service.pathHint ?? "Leave empty for everything"}>
+                <input value={d.remotePath} onChange={(e) => { set({ remotePath: e.target.value }); setTested(null); }} placeholder="/" spellCheck={false} />
+              </Field>
+            </div>
+          </div>
+          {service.note && <p className="muted small">{service.note}</p>}
+          {tested && (tested.total ? (
+            <div className="note ok"><Icon.Check size={16} />Connected. {formatBytes(tested.free)} free of {formatBytes(tested.total)}.</div>
+          ) : null)}
+        </div>
+      )}
+
+      {step === 1 && isOAuth && (
+        <div className="form">
+          {token || editing ? (
             <div className="signed-in">
-              <span className="avatar">{(p.account || "G")[0].toUpperCase()}</span>
+              <span className="avatar" style={{ background: service.color }}>{((p.type !== "webdav" && p.account) || service.label)[0].toUpperCase()}</span>
               <div>
-                <b>{p.account || "Signed in"}</b>
+                <b>{(p.type !== "webdav" && p.account) || "Signed in"}</b>
                 <span className="muted">{token ? "Signed in just now" : "Signed in"}</span>
               </div>
               <span className="grow" />
@@ -283,8 +353,8 @@ export function DriveWizard({ existing, info, driveCount, onClose, onSaved }: {
           ) : (
             <div className="google-start">
               <button className="btn google" onClick={signIn} disabled={signingIn}>
-                {signingIn ? <Spinner /> : <Icon.GDrive size={18} />}
-                {signingIn ? "Waiting for your browser…" : "Sign in with Google"}
+                {signingIn ? <Spinner /> : <ProviderIcon id={service.id} size={18} />}
+                {signingIn ? "Waiting for your browser…" : `Sign in with ${service.label}`}
               </button>
               {signingIn ? (
                 <div className="auth-wait">
@@ -302,16 +372,21 @@ export function DriveWizard({ existing, info, driveCount, onClose, onSaved }: {
                   <button className="link-btn" onClick={() => api.googleCancel()}>Cancel sign-in</button>
                 </div>
               ) : (
-                <p className="muted center">Your browser opens Google's sign-in page. NodaDock never sees your Google password.</p>
+                <p className="muted center">Your browser opens {service.label}'s sign-in page. NodaDock never sees your {service.label} password.</p>
               )}
             </div>
           )}
 
-          {p.type === "gdrive" && testing && <div className="note"><Spinner />Checking access to Google Drive…</div>}
-          {p.type === "gdrive" && tested && !testing && (
-            <div className="note ok"><Icon.Check size={16} />Google Drive is reachable{tested.total ? `. ${formatBytes(tested.free)} free of ${formatBytes(tested.total)}.` : "."}</div>
+          {testing && <div className="note"><Spinner />Checking access to {service.label}…</div>}
+          {tested && !testing && (
+            <div className="note ok"><Icon.Check size={16} />{service.label} is reachable{tested.total ? `. ${formatBytes(tested.free)} free of ${formatBytes(tested.total)}.` : "."}</div>
           )}
-          {(token || editing) && (
+          {(token || editing) && p.type !== "gdrive" && (
+            <Field label="Folder" hint="Leave empty for everything">
+              <input value={d.remotePath} onChange={(e) => set({ remotePath: e.target.value })} placeholder="/" spellCheck={false} />
+            </Field>
+          )}
+          {(token || editing) && p.type === "gdrive" && (
             <div className="row2">
               <Field label="Drive">
                 <select value={p.sharedDriveId} onChange={(e) => {
@@ -335,12 +410,12 @@ export function DriveWizard({ existing, info, driveCount, onClose, onSaved }: {
           {showAdvanced && (
             <div className="advanced">
               <p className="muted small">
-                Optional. Google limits how fast the shared default app ID can work. For heavy use, create your own
-                OAuth client in Google Cloud Console and enter it here, then sign in again.
+                Optional. {service.label} limits how fast the shared default app ID can work. For heavy use, create your own
+                OAuth app with {service.label} and enter its client ID and secret here, then sign in again.
               </p>
               <div className="row2">
                 <Field label="Client ID">
-                  <input value={p.clientId} onChange={(e) => setProv({ clientId: e.target.value })} spellCheck={false} />
+                  <input value={clientId} onChange={(e) => setClientId(e.target.value)} spellCheck={false} />
                 </Field>
                 <Field label="Client secret">
                   <PasswordInput value={clientSecret ?? ""} onChange={setClientSecret} />
@@ -391,9 +466,9 @@ export function DriveWizard({ existing, info, driveCount, onClose, onSaved }: {
               <Switch checked={d.autoMount} onChange={(v) => set({ autoMount: v })} label="Connect automatically" />
             </label>
 
-            {p.type === "webdav" && (
+            {usesPassword(d) && (
               <div className="option column">
-                <b>Password</b>
+                <b>{service.secretLabel ?? "Password"}</b>
                 <div className="radio-cards">
                   <button type="button" className={`radio-card ${d.rememberPassword ? "active" : ""}`} onClick={() => set({ rememberPassword: true })}>
                     <Icon.Shield size={18} />
@@ -447,6 +522,46 @@ export function DriveWizard({ existing, info, driveCount, onClose, onSaved }: {
         </div>
       )}
     </Modal>
+  );
+}
+
+function FormField({ f, opts, setOpt }: { f: ServiceField; opts: Record<string, string>; setOpt: (p: Record<string, string>) => void }) {
+  const cls = f.wide ? "wide" : "";
+  if (f.type === "check") {
+    return (
+      <label className={`check ${cls}`}>
+        <input type="checkbox" checked={opts[f.key] === "true"} onChange={(e) => setOpt({ [f.key]: e.target.checked ? "true" : "" })} />
+        {f.label}
+      </label>
+    );
+  }
+  if (f.type === "ftp-tls") {
+    const v = opts.tls === "true" ? "implicit" : opts.explicit_tls === "true" ? "explicit" : "none";
+    return (
+      <div className={cls}>
+        <Field label={f.label}>
+          <select value={v} onChange={(e) => setOpt({ explicit_tls: e.target.value === "explicit" ? "true" : "", tls: e.target.value === "implicit" ? "true" : "" })}>
+            <option value="none">None (plain FTP)</option>
+            <option value="explicit">Explicit TLS (FTPES)</option>
+            <option value="implicit">Implicit TLS (FTPS, port 990)</option>
+          </select>
+        </Field>
+      </div>
+    );
+  }
+  return (
+    <div className={cls}>
+      <Field label={f.label} hint={f.hint}>
+        {f.type === "select" ? (
+          <select value={opts[f.key] ?? f.default ?? ""} onChange={(e) => setOpt({ [f.key]: e.target.value })}>
+            {f.choices!.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+          </select>
+        ) : (
+          <input value={opts[f.key] ?? ""} placeholder={f.placeholder} spellCheck={false} autoComplete="off"
+            onChange={(e) => setOpt({ [f.key]: f.key === "port" ? e.target.value.replace(/\D/g, "").slice(0, 5) : e.target.value })} />
+        )}
+      </Field>
+    </div>
   );
 }
 

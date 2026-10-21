@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 import type { DriveView, Usage } from "../types";
 import { formatBytes, subtitle } from "../util";
+import { serviceOf, usesPassword } from "../services";
 import { Icon, ProviderIcon } from "./Icons";
 import { Menu, Spinner, Switch } from "./ui";
 
@@ -43,7 +44,7 @@ export function DriveCard({ drive, color, onToggle, onUnlock, onEdit, onRemove }
   return (
     <article className={`drive-card ${mounted ? "is-on" : ""}`} style={{ ["--drive" as string]: color }}>
       <div className="drive-top">
-        <div className="drive-tile"><ProviderIcon type={drive.provider.type} /></div>
+        <div className="drive-tile"><ProviderIcon id={serviceOf(drive).id} /></div>
         <div className="drive-id">
           <h3 title={drive.name}>{drive.name}</h3>
           <p className="muted ellipsis" title={subtitle(drive)}>{subtitle(drive)}</p>
@@ -63,7 +64,7 @@ export function DriveCard({ drive, color, onToggle, onUnlock, onEdit, onRemove }
         </span>
         <span className="letter" title={where}>{shortWhere}</span>
         {drive.readOnly && <span className="tag">Read-only</span>}
-        {!drive.rememberPassword && drive.provider.type === "webdav" && <span className="tag" title="Asks for the password at startup"><Icon.Lock size={11} />Ask</span>}
+        {!drive.rememberPassword && usesPassword(drive) && <span className="tag" title="Asks for the password at startup"><Icon.Lock size={11} />Ask</span>}
       </div>
 
       {drive.status === "error" && drive.error && <p className="drive-error"><Icon.Alert size={14} />{drive.error}</p>}
