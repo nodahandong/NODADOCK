@@ -6,7 +6,7 @@ reconnects by itself after a restart, and needs **no account or sign-up**.
 
 ![Drives](docs/screenshots/drives.png)
 
-NodaDock is an original app. It is inspired by what tools like NetDrive do, but shares
+NodaDock is an original app. It is inspired by what tools like Other Cloud Drive do, but shares
 no code, artwork or design with them.
 
 ## What it does
