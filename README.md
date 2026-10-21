@@ -9,6 +9,12 @@
   <a href="https://github.com/nodahandong/noda/releases/tag/builds"><b>Download for Windows and Mac</b></a>
 </p>
 
+> [!IMPORTANT]
+> **Educational project — not for sale.** NodaDock was made for learning purposes only. It is not a
+> commercial product, is not sold, and must not be used to attack, break into, or misuse any software,
+> service, or account. The entire app — code, design, icon, and documentation — was created by AI
+> (Claude, by Anthropic) at Noda's request. It is provided "as is", without warranty of any kind.
+
 A drive gets its own letter in File Explorer (for example `Z:`) or appears in Finder,
 reconnects by itself after a restart, and needs **no account or sign-up**.
 
@@ -127,6 +133,14 @@ By default NodaDock signs in with rclone's shared Google app ID, which Google ra
 its users. For heavy use, create your own OAuth client (Google Cloud Console → APIs & Services →
 Credentials → OAuth client ID → Desktop app), enable the Drive API, and enter the ID and secret under
 **Show advanced options** when adding the drive.
+
+## Disclaimer
+
+NodaDock is an educational project made entirely by AI (Claude, by Anthropic). It is not for sale and is
+not affiliated with, endorsed by, or connected to Google, Microsoft, Dropbox, Box, MEGA, Amazon, Backblaze,
+or any other company or product named here; those names are used only to say which services it can
+connect to. Use it only with accounts and servers you are allowed to access. It comes with no warranty,
+and you use it at your own risk.
 
 ## License
 

@@ -83,7 +83,15 @@ export function SettingsView({ settings, onChange, info, status }: {
         </Row>
       </section>
 
-      <p className="muted small center">NodaDock {info?.appVersion} · Powered by rclone · Your passwords never leave this computer except to sign in to your own servers.</p>
+      <section className="card about">
+        <h2 className="card-title">About</h2>
+        <p className="about-text">
+          <b>NodaDock {info?.appVersion}</b> is an educational project, made entirely by AI (Claude, by Anthropic).
+          It is not for sale and must not be used to attack or misuse any software, service or account.
+          Provided as is, without warranty. Not affiliated with any of the services it connects to.
+        </p>
+        <p className="muted small">Powered by rclone · Your passwords never leave this computer except to sign in to your own services.</p>
+      </section>
     </div>
   );
 }
