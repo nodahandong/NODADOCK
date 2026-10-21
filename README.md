@@ -130,4 +130,4 @@ Credentials → OAuth client ID → Desktop app), enable the Drive API, and ente
 
 ## License
 
-MIT. Bundles rclone (MIT). WinFsp, FUSE-T and macFUSE are installed separately under their own licenses.
+MIT. Bundles rclone (MIT); see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for all third-party licenses. WinFsp, FUSE-T and macFUSE are installed separately under their own licenses.
